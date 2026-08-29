@@ -24,7 +24,9 @@ async function cleanupInvalidRecoveryRecords(client = pool) {
             deletedActions: deleteActionsRes.rowCount
         };
     } catch (err) {
-        console.error("Error cleaning up invalid recovery records:", err);
+        if (!err.message || !err.message.includes("Cannot use a pool after calling end")) {
+            console.error("Error cleaning up invalid recovery records:", err);
+        }
         return { deletedAuditLogs: 0, deletedActions: 0 };
     }
 }
