@@ -40,9 +40,13 @@ export default function TransactionDetailModal({
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    if (!isOpen || !transactionId) return;
+    if (!isOpen || !transactionId) {
+      setData(null);
+      return;
+    }
 
     let isMounted = true;
+    setData(null);
     setLoading(true);
     setError(null);
 
@@ -114,7 +118,7 @@ export default function TransactionDetailModal({
 
         {/* Modal Content */}
         <div className="flex-1 overflow-y-auto p-6 space-y-5">
-          {loading ? (
+          {loading || !tx ? (
             <div className="py-24 flex flex-col items-center justify-center space-y-3 font-mono">
               <div className="w-10 h-10 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin" />
               <p className="text-sm text-cyan-300 font-semibold uppercase tracking-wider">
