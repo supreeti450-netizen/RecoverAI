@@ -423,7 +423,6 @@ async function getRecoveryActions({ transaction_id = null, status = null, requir
             ra.reason,
             ra.status,
             ra.requires_human,
-            ra.executed_at,
             ra.result,
             ra.recovered_amount,
             ra.created_at
@@ -528,8 +527,7 @@ async function reviewRecoveryAction(actionId, { decision, reviewer, reason }) {
             UPDATE recovery_actions
             SET status = $1,
                 requires_human = false,
-                result = $2,
-                executed_at = NOW()
+                result = $2
             WHERE action_id = $3
             RETURNING *
             `,
@@ -859,7 +857,7 @@ async function getTransactionsList({
             CASE WHEN t.status = 'FAILED' THEN ra.status ELSE NULL END AS action_status,
             CASE WHEN t.status = 'FAILED' THEN ra.requires_human ELSE false END AS requires_human,
             CASE WHEN t.status = 'FAILED' THEN ra.result ELSE NULL END AS action_result,
-            CASE WHEN t.status = 'FAILED' THEN ra.executed_at ELSE NULL END AS action_executed_at,
+            CASE WHEN t.status = 'FAILED' THEN ra.created_at ELSE NULL END AS action_executed_at,
             CASE WHEN t.status = 'FAILED' THEN ra.recovered_amount ELSE '0.00' END AS recovered_amount
         FROM transactions t
         LEFT JOIN LATERAL (
