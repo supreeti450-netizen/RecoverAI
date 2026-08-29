@@ -1,4 +1,4 @@
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/recovery';
+const BASE_URL = import.meta.env.VITE_API_URL || '/api/recovery';
 
 async function handleResponse(response) {
   if (!response.ok) {

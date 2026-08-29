@@ -1,0 +1,21 @@
+{
+  "name": "recoverai-platform",
+  "version": "2.4.0",
+  "description": "RecoverAI — Revenue Recovery & Decision Intelligence Platform",
+  "scripts": {
+    "start": "npm --prefix server start",
+    "dev:server": "npm --prefix server run dev",
+    "dev:client": "npm --prefix client run dev",
+    "build": "npm --prefix client run build",
+    "test": "npm --prefix server test"
+  },
+  "keywords": [
+    "fintech",
+    "revenue-recovery",
+    "payments",
+    "decision-intelligence",
+    "guardrails"
+  ],
+  "author": "",
+  "license": "ISC"
+}
