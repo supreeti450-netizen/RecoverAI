@@ -384,11 +384,44 @@ CATEGORY 7: Enterprise Data Consistency Verification                 [ 7/7  PASS
 
 ---
 
-## 17. Future Improvements
+## 18. Production Deployment
 
-1. **Live Webhook Streaming**: Real-time webhook listeners for live payment gateway failure event streams (Razorpay/Stripe).
-2. **Adaptive Machine Learning**: Bayesian dynamic parameter estimation based on acquiring bank latency and bank downtime status feeds.
-3. **Multi-Tenant Merchant Dashboards**: Role-based access control (RBAC) with customizable merchant retry policies and SLA alerting.
+### 1. Required Environment Variables
+| Variable | Description | Example / Default |
+| :--- | :--- | :--- |
+| `DATABASE_URL` | Cloud PostgreSQL connection URI | `postgresql://user:pass@host:5432/recoverai?sslmode=require` |
+| `DB_SSL` | Enable SSL for hosted PostgreSQL | `true` |
+| `PORT` | Web server listening port | `5000` (Assigned by cloud host) |
+| `NODE_ENV` | Application runtime environment | `production` |
+| `VITE_API_URL` | Frontend API base URL | `/api/recovery` (Defaults to relative path) |
+
+### 2. Database Provisioning & Setup
+1. Create a managed PostgreSQL instance (e.g. Neon, Supabase, AWS RDS, Render Postgres).
+2. Execute the schema tables (`transactions`, `recovery_actions`, `audit_logs`) from Section 11.
+3. Seed baseline transaction telemetry using `node server/scripts/generateTransactions.js`.
+
+### 3. Build & Run Production Server
+```bash
+# Install server and client dependencies
+npm run install:all
+
+# Compile optimized frontend production bundle
+npm run build
+
+# Start unified Node/Express server serving APIs and static UI
+npm start
+```
+
+### 4. Health & Liveness Probes
+* **Endpoint**: `GET /health`
+* **Response**:
+  ```json
+  {
+    "status": "ok",
+    "database": "connected",
+    "timestamp": "2026-08-29T11:00:00.000Z"
+  }
+  ```
 
 ---
 

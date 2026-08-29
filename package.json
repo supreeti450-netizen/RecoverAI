@@ -3,10 +3,11 @@
   "version": "2.4.0",
   "description": "RecoverAI — Revenue Recovery & Decision Intelligence Platform",
   "scripts": {
-    "start": "npm --prefix server start",
+    "start": "node server/server.js",
+    "build": "npm --prefix client run build",
+    "install:all": "npm install --prefix server && npm install --prefix client",
     "dev:server": "npm --prefix server run dev",
     "dev:client": "npm --prefix client run dev",
-    "build": "npm --prefix client run build",
     "test": "npm --prefix server test"
   },
   "keywords": [

@@ -1,34 +1,54 @@
 const express = require("express");
 const cors = require("cors");
-require("dotenv").config();
+const path = require("path");
+const fs = require("fs");
+require("dotenv").config({ path: path.join(__dirname, ".env") });
 const pool = require("./db");
 const recoveryRoutes = require("./routes/recoveryRoutes");
+
 const app = express();
 
 app.use(cors());
 app.use(express.json());
+
+// API Routes
 app.use("/api/recovery", recoveryRoutes);
 
-app.get("/", (req, res) => {
-  res.json({
-    message: "RecoverAI backend is running 🚀"
-  });
-});
-
+// Health Check Endpoint
 app.get("/health", async (req, res) => {
   try {
     await pool.query("SELECT 1");
     res.status(200).json({
       status: "ok",
-      database: "connected"
+      database: "connected",
+      timestamp: new Date().toISOString()
     });
   } catch (err) {
     res.status(503).json({
       status: "error",
-      database: "disconnected"
+      database: "disconnected",
+      timestamp: new Date().toISOString()
     });
   }
 });
+
+// Production Static Client Serving
+const clientDistPath = path.join(__dirname, "../client/dist");
+if (fs.existsSync(clientDistPath)) {
+  app.use(express.static(clientDistPath));
+  app.use((req, res, next) => {
+    if (req.method === "GET" && !req.path.startsWith("/api") && req.path !== "/health") {
+      return res.sendFile(path.join(clientDistPath, "index.html"));
+    }
+    next();
+  });
+} else {
+  app.get("/", (req, res) => {
+    res.json({
+      message: "RecoverAI backend is running 🚀"
+    });
+  });
+}
 
 const PORT = process.env.PORT || 5000;
 pool.query("SELECT NOW()", (err, result) => {
@@ -39,6 +59,8 @@ pool.query("SELECT NOW()", (err, result) => {
         console.log("Database time:", result.rows[0].now);
     }
 });
-app.listen(PORT, () => {
-  console.log(`RecoverAI server running on port ${PORT}`);
+
+const HOST = process.env.HOST || "0.0.0.0";
+app.listen(PORT, HOST, () => {
+  console.log(`RecoverAI server running on http://${HOST}:${PORT}`);
 });
