@@ -1,0 +1,44 @@
+# Dependency Directories
+node_modules/
+*/node_modules/
+
+# Production Build Artifacts
+dist/
+*/dist/
+build/
+*/build/
+dist-ssr/
+
+# Environment Variables & Secrets
+.env
+*.env
+.env.*
+!.env.example
+*.local
+
+# Server Logs & Runtime Data
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# OS & Editor Metadata
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Temporary & Scratch Files
+tmp/
+temp/
+*.tmp
+scratch/
