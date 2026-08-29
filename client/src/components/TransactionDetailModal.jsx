@@ -42,6 +42,8 @@ export default function TransactionDetailModal({
   useEffect(() => {
     if (!isOpen || !transactionId) {
       setData(null);
+      setLoading(false);
+      setError(null);
       return;
     }
 
@@ -59,7 +61,7 @@ export default function TransactionDetailModal({
       })
       .catch((err) => {
         if (isMounted) {
-          setError(err.message || 'Failed to analyze transaction');
+          setError(err?.message || 'Failed to analyze transaction');
           setLoading(false);
         }
       });
@@ -95,7 +97,7 @@ export default function TransactionDetailModal({
                 <span className="font-mono text-base font-black text-white tracking-wider">
                   {transactionId}
                 </span>
-                {tx && (
+                {tx?.status && (
                   <span
                     className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border ${
                       getStatusBadge(tx.status).bg
@@ -118,7 +120,7 @@ export default function TransactionDetailModal({
 
         {/* Modal Content */}
         <div className="flex-1 overflow-y-auto p-6 space-y-5">
-          {loading || !tx ? (
+          {loading ? (
             <div className="py-24 flex flex-col items-center justify-center space-y-3 font-mono">
               <div className="w-10 h-10 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin" />
               <p className="text-sm text-cyan-300 font-semibold uppercase tracking-wider">
@@ -130,6 +132,10 @@ export default function TransactionDetailModal({
               <p className="font-bold">Telemetry Query Failed</p>
               <p className="text-xs text-rose-300/80 mt-1">{error}</p>
             </div>
+          ) : !tx ? (
+            <div className="py-24 flex flex-col items-center justify-center space-y-3 font-mono text-slate-400 text-sm">
+              <p>No transaction details available.</p>
+            </div>
           ) : (
             <>
               {/* Transaction Key Stats Grid */}
@@ -140,7 +146,7 @@ export default function TransactionDetailModal({
                     Amount
                   </div>
                   <div className="text-lg font-black text-white font-mono mt-1">
-                    {formatINR(tx.amount)}
+                    {formatINR(tx?.amount)}
                   </div>
                 </div>
 
@@ -150,7 +156,7 @@ export default function TransactionDetailModal({
                     Channel
                   </div>
                   <div className="text-sm font-semibold text-white mt-1">
-                    {tx.payment_method}
+                    {tx?.payment_method || '—'}
                   </div>
                 </div>
 
@@ -160,17 +166,17 @@ export default function TransactionDetailModal({
                     Fraud Score
                   </div>
                   <div className="text-base font-bold text-white font-mono mt-1 flex items-center gap-1">
-                    {tx.fraud_score}
+                    {tx?.fraud_score ?? '0.00'}
                     <span
                       className={`text-[10px] px-1.5 py-0.2 rounded font-mono ${
-                        Number(tx.fraud_score) < 0.3
+                        Number(tx?.fraud_score || 0) < 0.3
                           ? 'bg-emerald-500/15 text-emerald-400'
-                          : Number(tx.fraud_score) < 0.7
+                          : Number(tx?.fraud_score || 0) < 0.7
                           ? 'bg-amber-500/15 text-amber-400'
                           : 'bg-rose-500/15 text-rose-400'
                       }`}
                     >
-                      {Number(tx.fraud_score) < 0.3 ? 'LOW' : Number(tx.fraud_score) < 0.7 ? 'MED' : 'HIGH'}
+                      {Number(tx?.fraud_score || 0) < 0.3 ? 'LOW' : Number(tx?.fraud_score || 0) < 0.7 ? 'MED' : 'HIGH'}
                     </span>
                   </div>
                 </div>
@@ -181,13 +187,13 @@ export default function TransactionDetailModal({
                     Recovery Prob
                   </div>
                   <div className="text-base font-bold text-emerald-400 font-mono mt-1">
-                    {formatPercentage(tx.recovery_probability)}
+                    {formatPercentage(tx?.recovery_probability)}
                   </div>
                 </div>
               </div>
 
               {/* Successful Transaction Information Banner */}
-              {tx.status !== 'FAILED' ? (
+              {tx?.status !== 'FAILED' ? (
                 <div className="p-5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 space-y-2">
                   <div className="flex items-center space-x-2 text-emerald-400 text-sm font-bold font-mono">
                     <CheckCircle2 className="w-5 h-5" />
@@ -200,7 +206,7 @@ export default function TransactionDetailModal({
               ) : (
                 <>
                   {/* Failure Reason Banner */}
-                  {tx.failure_reason && (
+                  {tx?.failure_reason && (
                     <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-between">
                       <div className="flex items-center space-x-2.5">
                         <AlertTriangle className="w-4 h-4 text-rose-400 flex-shrink-0" />
@@ -210,7 +216,7 @@ export default function TransactionDetailModal({
                         </div>
                       </div>
                       <div className="text-xs font-mono text-slate-400">
-                        Retry Count: <span className="font-bold text-white">{tx.retry_count} / 2</span>
+                        Retry Count: <span className="font-bold text-white">{tx?.retry_count ?? 0} / 2</span>
                       </div>
                     </div>
                   )}
@@ -230,7 +236,7 @@ export default function TransactionDetailModal({
                         </div>
                       </div>
 
-                      {agent && (
+                      {agent?.decision && (
                         <span
                           className={`text-xs font-bold font-mono px-3 py-1 rounded-lg border ${
                             getActionTypeColor(agent.decision)
@@ -244,17 +250,17 @@ export default function TransactionDetailModal({
                     {agent && (
                       <>
                         <p className="text-xs font-mono text-slate-200 leading-relaxed bg-space-950/80 p-3 rounded-lg border border-indigo-500/20">
-                          "{agent.reason}"
+                          "{agent.reason || 'Evaluation completed.'}"
                         </p>
 
                         {/* Mathematical Formula Telemetry */}
                         <div className="p-2.5 rounded-lg bg-space-950/90 border border-cyan-500/20 text-[10px] font-mono text-slate-300 space-y-1">
                           <div className="text-cyan-400 font-bold uppercase">Mathematical Scoring Model:</div>
                           <div className="text-slate-400">
-                            P(recovery) = BaseProb({tx.failure_reason}) &times; (1 - 0.25&times;Retries({tx.retry_count})) &times; (1 - 0.40&times;Fraud({tx.fraud_score}))
+                            P(recovery) = BaseProb({tx?.failure_reason || 'GENERIC'}) &times; (1 - 0.25&times;Retries({tx?.retry_count ?? 0})) &times; (1 - 0.40&times;Fraud({tx?.fraud_score ?? 0}))
                           </div>
                           <div className="text-emerald-400 font-bold">
-                            &rarr; Calculated Recovery Probability: {formatPercentage(tx.recovery_probability)}
+                            &rarr; Calculated Recovery Probability: {formatPercentage(tx?.recovery_probability)}
                           </div>
                         </div>
 
@@ -264,7 +270,7 @@ export default function TransactionDetailModal({
                             <div className="w-32 h-2 rounded-full bg-space-950 overflow-hidden border border-indigo-500/20">
                               <div
                                 className="h-full rounded-full bg-gradient-to-r from-cyan-500 to-violet-500"
-                                style={{ width: `${Math.min(100, (agent.confidence || 0) * 100)}%` }}
+                                style={{ width: `${Math.min(100, Math.max(0, (Number(agent.confidence) || 0) * 100))}%` }}
                               />
                             </div>
                             <span className="font-bold text-white">
@@ -310,7 +316,7 @@ export default function TransactionDetailModal({
                     </div>
 
                     {/* Individual Guardrail Rules Breakdown */}
-                    {guardrails?.checks && (
+                    {Array.isArray(guardrails?.checks) && guardrails.checks.length > 0 && (
                       <div className="space-y-2 pt-2">
                         <div className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider">
                           Policy Enforcement Telemetry
@@ -320,30 +326,30 @@ export default function TransactionDetailModal({
                             <div
                               key={idx}
                               className={`p-2.5 rounded-lg border flex items-center justify-between text-xs ${
-                                check.passed
+                                check?.passed
                                   ? 'bg-emerald-500/5 border-emerald-500/20 text-slate-200'
                                   : 'bg-rose-500/5 border-rose-500/20 text-rose-300'
                               }`}
                             >
                               <div className="flex items-center space-x-2">
-                                {check.passed ? (
+                                {check?.passed ? (
                                   <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
                                 ) : (
                                   <XCircle className="w-4 h-4 text-rose-400 flex-shrink-0" />
                                 )}
                                 <div>
-                                  <span className="text-[11px] font-medium block">{check.rule}</span>
-                                  <span className="text-[9px] text-slate-400 font-sans block">{check.detail || check.reason}</span>
+                                  <span className="text-[11px] font-medium block">{check?.rule}</span>
+                                  <span className="text-[9px] text-slate-400 font-sans block">{check?.detail || check?.reason || ''}</span>
                                 </div>
                               </div>
                               <span
                                 className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded flex-shrink-0 ml-2 ${
-                                  check.passed
+                                  check?.passed
                                     ? 'bg-emerald-500/20 text-emerald-400'
                                     : 'bg-rose-500/20 text-rose-400'
                                 }`}
                               >
-                                {check.passed ? 'PASSED' : 'BLOCKED'}
+                                {check?.passed ? 'PASSED' : 'BLOCKED'}
                               </span>
                             </div>
                           ))}
@@ -370,7 +376,7 @@ export default function TransactionDetailModal({
             >
               CLOSE CONSOLE
             </button>
-            {data?.action_id && guardrails?.escalationRequired && (
+            {data?.action_id && guardrails?.escalationRequired ? (
               <button
                 onClick={() => {
                   onClose();
@@ -380,7 +386,7 @@ export default function TransactionDetailModal({
               >
                 OPEN SIGN-OFF
               </button>
-            )}
+            ) : null}
           </div>
         </div>
       </div>

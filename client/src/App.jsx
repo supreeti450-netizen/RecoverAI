@@ -5,6 +5,7 @@ import TransactionDetailModal from './components/TransactionDetailModal';
 import HumanReviewModal from './components/HumanReviewModal';
 import BatchAnalysisModal from './components/BatchAnalysisModal';
 import StarfieldBackground from './components/StarfieldBackground';
+import ErrorBoundary from './components/ErrorBoundary';
 
 import OverviewPage from './pages/OverviewPage';
 import TransactionsPage from './pages/TransactionsPage';
@@ -151,15 +152,17 @@ export default function App() {
       </div>
 
       {/* Interactive Modals */}
-      <TransactionDetailModal
-        transactionId={selectedTxId}
-        isOpen={isTxModalOpen}
-        onClose={() => {
-          setIsTxModalOpen(false);
-          setSelectedTxId(null);
-        }}
-        onOpenReviewModal={handleOpenReviewModal}
-      />
+      <ErrorBoundary>
+        <TransactionDetailModal
+          transactionId={selectedTxId}
+          isOpen={isTxModalOpen}
+          onClose={() => {
+            setIsTxModalOpen(false);
+            setSelectedTxId(null);
+          }}
+          onOpenReviewModal={handleOpenReviewModal}
+        />
+      </ErrorBoundary>
 
       <HumanReviewModal
         actionId={reviewMeta.actionId}
