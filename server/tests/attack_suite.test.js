@@ -17,7 +17,10 @@ const {
     getFailureReasonAnalytics
 } = require("../services/recoveryEngine");
 
-const BASE_URL = "http://localhost:5000/api/recovery";
+const app = require("../server");
+
+let BASE_URL = process.env.API_BASE_URL || "";
+let testServer = null;
 
 let totalTests = 0;
 let passedTests = 0;
@@ -43,6 +46,14 @@ async function runAttackSuite() {
     console.log("================================================================================\n");
 
     try {
+        if (!BASE_URL) {
+            testServer = await new Promise((resolve, reject) => {
+                const s = app.listen(0, "127.0.0.1", () => resolve(s));
+                s.on("error", reject);
+            });
+            const port = testServer.address().port;
+            BASE_URL = `http://127.0.0.1:${port}/api/recovery`;
+        }
         // =========================================================================
         // CATEGORY 1: TRANSACTION SAFETY & IDEMPOTENCY
         // =========================================================================
@@ -396,6 +407,10 @@ async function runAttackSuite() {
             console.log("\n 🏆 ZERO DEFECTS FOUND. All security, state machine, and consistency assertions passed!");
         }
         console.log("================================================================================\n");
+
+        if (testServer) {
+            await new Promise((resolve) => testServer.close(resolve));
+        }
 
         await pool.end();
         process.exit(failedTests === 0 ? 0 : 1);
