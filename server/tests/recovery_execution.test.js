@@ -83,6 +83,12 @@ async function runRecoveryExecutionTests() {
         const actionId = analysis.actionId;
         assert(typeof actionId === "number" && actionId > 0, `Action created or retrieved for ${safeTx.transaction_id} (action_id: #${actionId})`);
 
+        // Ensure clean test baseline for action
+        await pool.query(
+            "UPDATE recovery_actions SET status = 'APPROVED', requires_human = false, result = 'WAIT_AND_RETRY', recovered_amount = 0.00 WHERE action_id = $1",
+            [actionId]
+        );
+
         // Execute recovery dispatch via HTTP API
         const execRes = await fetch(`${BASE_URL}/execute/${actionId}`, {
             method: "POST",
@@ -145,6 +151,12 @@ async function runRecoveryExecutionTests() {
         const highRiskTx = highRiskTxRes.rows[0];
         const highRiskAnalysis = await analyzeAndRecordTransaction(highRiskTx, pool);
         const highRiskActionId = highRiskAnalysis.actionId;
+
+        // Reset the test high-risk action to unapproved state for repeatable test runs
+        await pool.query(
+            "UPDATE recovery_actions SET status = 'BLOCKED', requires_human = true, result = 'HUMAN_REVIEW', recovered_amount = 0.00 WHERE action_id = $1",
+            [highRiskActionId]
+        );
 
         // Attempt to execute without human sign-off -> MUST BE BLOCKED
         const blockedExecRes = await fetch(`${BASE_URL}/execute/${highRiskActionId}`, {

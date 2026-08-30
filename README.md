@@ -3,7 +3,7 @@
 > **Track 3: AI Revenue Recovery** | High-Performance FinTech Decision Intelligence & Operator Command Center
 
 ![RecoverAI Architecture](https://img.shields.io/badge/Architecture-Deterministic%20Guardrails%20%2B%20AI%20Decision%20Models-blueviolet)
-![Tests](https://img.shields.io/badge/Automated%20Tests-98%2F98%20Passed%20(100%25)-emerald)
+![Tests](https://img.shields.io/badge/Automated%20Tests-153%2F153%20Passed%20(100%25)-emerald)
 ![Database](https://img.shields.io/badge/Database-PostgreSQL%2016-blue)
 ![Frontend](https://img.shields.io/badge/Frontend-React%2019%20%7C%20Vite%20%7C%20TailwindCSS-cyan)
 ![Node](https://img.shields.io/badge/Node.js-v18%2B-green)
@@ -50,6 +50,8 @@ RecoverAI replaces static retry mechanisms with an **intelligent, risk-aware rec
 * **High-Density Telemetry Stream**: Search, multi-filter, and sort across 1,000 live transaction streams with instant modal inspection.
 * **Prioritized Recovery Targets**: Yield-ranked candidate matrix segmented into *Safe to Automate* vs *Operator Sign-Off Required*.
 * **Operator Sign-Off Station**: Dedicated escalation console with 1-click Approve/Reject decision workflows and auditable justification tracking.
+* **Simulated Gateway Recovery Dispatch**: Safe payment rail retry simulation (`POST /api/recovery/execute/:actionId`) with 100% GMV amount capping, idempotency locks, and zero real financial risk.
+* **One-Click Compliance Exports (CSV & JSON)**: RFC-4180 compliant exports with UTF-8 BOM encoding across audit ledgers and candidate pools.
 * **Revenue Intelligence Analytics**: Cross-channel failure rate breakdowns, decline root-cause exposure charts, and AI decision distribution metrics.
 * **Cryptographic Compliance Timeline**: Chronological event logs with expandable 5-point guardrail verification checklists.
 * **Autonomous Mission Control (Batch AI)**: Idempotent 1-click batch analysis across unanalyzed payment failures.
@@ -104,8 +106,9 @@ recoverai/
 │       │   ├── OverviewPage.jsx     # Executive Command Center overview
 │       │   └── TransactionsPage.jsx # High-density telemetry data stream
 │       ├── services/
-│       │   └── api.js               # REST client for all 10 endpoint categories
+│       │   └── api.js               # REST client for all 11 endpoint categories
 │       └── utils/
+│           ├── exportUtils.js       # RFC-4180 CSV & JSON compliance serializers
 │           └── formatters.js        # INR currency, percentages, timestamps
 └── server/                          # Node.js + Express Backend API
     ├── .env                         # Local environment variables (IGNORED BY GIT)
@@ -126,7 +129,9 @@ recoverai/
     │   └── recoveryEngine.js        # DB operations, queries & batch workflows
     └── tests/
         ├── attack_suite.test.js     # 73-point recruiter attack & stress test suite
-        └── recovery_workflow.test.js # 25-point logic audit workflow test suite
+        ├── recovery_workflow.test.js # 25-point logic audit workflow test suite
+        ├── export_utils.test.js     # 25-point RFC-4180 CSV/JSON compliance test suite
+        └── recovery_execution.test.js # 30-point gateway execution simulation test suite
 ```
 
 ---
@@ -248,7 +253,8 @@ CREATE TABLE recovery_actions (
     confidence NUMERIC(5, 4) NOT NULL,
     requires_human BOOLEAN DEFAULT false,
     reason TEXT NOT NULL,
-    result VARCHAR(50),                        -- PENDING_EXECUTION, APPROVED_BY_HUMAN, REJECTED_BY_HUMAN
+    result VARCHAR(50),                        -- PENDING_EXECUTION, APPROVED_BY_HUMAN, REJECTED_BY_HUMAN, RECOVERED
+    recovered_amount NUMERIC(12, 2) DEFAULT 0.00,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -257,11 +263,11 @@ CREATE TABLE audit_logs (
     log_id SERIAL PRIMARY KEY,
     transaction_id VARCHAR(50) NOT NULL,
     action_id INT REFERENCES recovery_actions(action_id),
-    actor VARCHAR(50) NOT NULL,                -- AI_AGENT, RiskOfficer_Lead, etc.
-    event_type VARCHAR(50) NOT NULL,           -- RECOVERY_ANALYSIS, HUMAN_REVIEW
+    actor VARCHAR(50) NOT NULL,                -- AI_AGENT, RiskOfficer_Lead, RecoverAI Gateway Dispatcher
+    event_type VARCHAR(50) NOT NULL,           -- RECOVERY_ANALYSIS, HUMAN_REVIEW, RECOVERY_EXECUTION
     decision VARCHAR(50) NOT NULL,
     guardrails_checked JSONB NOT NULL,         -- Array of boolean check outcomes
-    outcome VARCHAR(50) NOT NULL,              -- ACTION_APPROVED, ACTION_BLOCKED, ACTION_REJECTED
+    outcome VARCHAR(50) NOT NULL,              -- ACTION_APPROVED, ACTION_BLOCKED, ACTION_REJECTED, RECOVERY_SUCCESSFUL
     reasoning TEXT NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -284,7 +290,8 @@ CREATE TABLE audit_logs (
 | **GET** | `/audit-logs` | Chronological immutable audit trail events. | `transaction_id`, `event_type`, `page`, `limit` |
 | **GET** | `/analyze/:transactionId` | Single-transaction analysis & guardrail validation. | `transactionId` (URL parameter) |
 | **POST**| `/batch-analyze` | Batch execution across all unanalyzed failures. | `{ "limit": 200 }` |
-| **POST**| `/review/:actionId` | Operator sign-off approval or rejection. | `{ "decision": "APPROVE", "reviewer": "RiskLead", "reason": "..." }` |
+| **POST**| `/human-review/:actionId` | Operator sign-off approval or rejection. | `{ "decision": "APPROVE", "reviewer": "RiskLead", "reason": "..." }` |
+| **POST**| `/execute/:actionId` | Simulated gateway payment rail recovery execution. | `{ "dispatcher": "RecoverAI Gateway Dispatcher" }` |
 
 ---
 
@@ -338,18 +345,15 @@ NODE_ENV=development
 
 ## 15. Testing & Verification
 
-RecoverAI incorporates a dual-layer automated testing suite with **98 automated assertions**:
+RecoverAI incorporates 4 comprehensive automated testing suites with **153 automated assertions**:
 
 ```bash
-# Run Recruiter-Level Attack & Stress Test Suite (73 Assertions)
-node server/tests/attack_suite.test.js
-
-# Run Recovery Workflow Test Suite (25 Assertions)
-node server/tests/recovery_workflow.test.js
+# Run All 4 Suites Concurrently via Independent Test Runner
+npm test
 ```
 
 ### Test Results Summary:
-$$\mathbf{98\text{ Automated Assertions Tested}} \quad \vert \quad \mathbf{98\text{ Passed (100\% Success Rate)}} \quad \vert \quad \mathbf{0\text{ Failures}}$$
+$$\mathbf{153\text{ Automated Assertions Tested}} \quad \vert \quad \mathbf{153\text{ Passed (100\% Success Rate)}} \quad \vert \quad \mathbf{0\text{ Failures}}$$
 
 ```
 ================================================================================
@@ -365,6 +369,8 @@ CATEGORY 7: Enterprise Data Consistency Verification                 [ 7/7  PASS
 --------------------------------------------------------------------------------
  📊 STRESS & ATTACK TEST SUMMARY: Total: 73 | Passed: 73 | Failed: 0
  📊 WORKFLOW LOGIC TEST SUMMARY: Total: 25 | Passed: 25 | Failed: 0
+ 📊 COMPLIANCE EXPORT SUMMARY:   Total: 25 | Passed: 25 | Failed: 0
+ 📊 GATEWAY EXECUTION SUMMARY:   Total: 30 | Passed: 30 | Failed: 0
  🏆 ZERO DEFECTS FOUND. All security, state machine, and consistency assertions passed!
 ================================================================================
 ```
