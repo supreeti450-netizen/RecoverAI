@@ -9,6 +9,7 @@ const {
     getAuditLogs,
     getRecoveryActions,
     reviewRecoveryAction,
+    executeRecoveryAction,
     getAnalyticsSummary,
     getPaymentMethodAnalytics,
     getFailureReasonAnalytics
@@ -325,6 +326,48 @@ router.get("/analyze/:transactionId", async (req, res) => {
         res.status(500).json({
             success: false,
             message: "Failed to analyze transaction"
+        });
+    }
+});
+
+// ----------------------------------------------------
+// 8. Recovery Execution Dispatch API (Simulated Gateway Dispatch)
+// ----------------------------------------------------
+router.post("/execute/:actionId", async (req, res) => {
+    try {
+        const { actionId } = req.params;
+        const { dispatcher } = req.body || {};
+
+        const executionResult = await executeRecoveryAction(actionId, { dispatcher });
+
+        if (executionResult.error) {
+            let statusCode = 400;
+            if (executionResult.error === "NOT_FOUND") {
+                statusCode = 404;
+            } else if (executionResult.error === "EXECUTION_BLOCKED" || executionResult.error === "NOT_ELIGIBLE") {
+                statusCode = 400;
+            }
+            return res.status(statusCode).json({
+                success: false,
+                error: executionResult.error,
+                message: executionResult.message,
+                checks: executionResult.checks || []
+            });
+        }
+
+        res.json({
+            success: true,
+            message: executionResult.message,
+            already_executed: executionResult.already_executed || false,
+            action: executionResult.action,
+            execution: executionResult.execution,
+            audit_log: executionResult.audit_log
+        });
+    } catch (error) {
+        console.error("Error executing recovery dispatch:", error);
+        res.status(500).json({
+            success: false,
+            message: "Failed to execute recovery dispatch"
         });
     }
 });

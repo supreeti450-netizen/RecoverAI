@@ -39,11 +39,19 @@ export default function TransactionDetailModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  // Execution dispatch state
+  const [executionState, setExecutionState] = useState(null); // 'RUNNING' | 'SUCCESS' | 'BLOCKED' | 'FAILED'
+  const [executionMessage, setExecutionMessage] = useState('');
+  const [executionDetails, setExecutionDetails] = useState(null);
+
   useEffect(() => {
     if (!isOpen || !transactionId) {
       setData(null);
       setLoading(false);
       setError(null);
+      setExecutionState(null);
+      setExecutionMessage('');
+      setExecutionDetails(null);
       return;
     }
 
@@ -51,6 +59,9 @@ export default function TransactionDetailModal({
     setData(null);
     setLoading(true);
     setError(null);
+    setExecutionState(null);
+    setExecutionMessage('');
+    setExecutionDetails(null);
 
     api.analyzeTransaction(transactionId)
       .then((res) => {
@@ -70,6 +81,34 @@ export default function TransactionDetailModal({
       isMounted = false;
     };
   }, [isOpen, transactionId]);
+
+  const handleExecuteRecovery = async () => {
+    if (!data?.action_id) return;
+    setExecutionState('RUNNING');
+    setExecutionMessage('Simulating gateway payment rail retry dispatch...');
+
+    try {
+      const res = await api.executeRecoveryAction(data.action_id, {
+        dispatcher: 'RecoverAI Operator Station'
+      });
+
+      if (res.success) {
+        setExecutionState('SUCCESS');
+        setExecutionMessage(res.message || 'Gateway recovery dispatch simulated successfully.');
+        setExecutionDetails(res.execution);
+      } else {
+        setExecutionState('BLOCKED');
+        setExecutionMessage(res.message || 'Execution blocked by guardrails.');
+      }
+    } catch (err) {
+      if (err.message && err.message.toLowerCase().includes('guardrail')) {
+        setExecutionState('BLOCKED');
+      } else {
+        setExecutionState('FAILED');
+      }
+      setExecutionMessage(err.message || 'Failed to execute recovery dispatch');
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -357,6 +396,69 @@ export default function TransactionDetailModal({
                       </div>
                     )}
                   </div>
+
+                  {/* Simulated Gateway Recovery Dispatch Telemetry Card */}
+                  {(executionState || data?.action?.result === 'RECOVERED') && (
+                    <div
+                      className={`p-4 rounded-xl border font-mono space-y-2 animate-fadeIn ${
+                        executionState === 'SUCCESS' || data?.action?.result === 'RECOVERED'
+                          ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-300 shadow-lg shadow-emerald-950/40'
+                          : executionState === 'RUNNING'
+                          ? 'bg-cyan-500/10 border-cyan-500/40 text-cyan-300 shadow-lg shadow-cyan-950/40'
+                          : executionState === 'BLOCKED'
+                          ? 'bg-amber-500/10 border-amber-500/40 text-amber-300 shadow-lg shadow-amber-950/40'
+                          : 'bg-rose-500/10 border-rose-500/40 text-rose-300 shadow-lg shadow-rose-950/40'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider">
+                        <div className="flex items-center space-x-2">
+                          {executionState === 'RUNNING' ? (
+                            <Zap className="w-4 h-4 text-cyan-400 animate-spin" />
+                          ) : executionState === 'SUCCESS' || data?.action?.result === 'RECOVERED' ? (
+                            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                          ) : executionState === 'BLOCKED' ? (
+                            <ShieldAlert className="w-4 h-4 text-amber-400" />
+                          ) : (
+                            <XCircle className="w-4 h-4 text-rose-400" />
+                          )}
+                          <span>
+                            {executionState === 'RUNNING'
+                              ? 'EXECUTION STARTED'
+                              : executionState === 'SUCCESS' || data?.action?.result === 'RECOVERED'
+                              ? 'EXECUTION SUCCESS'
+                              : executionState === 'BLOCKED'
+                              ? 'EXECUTION BLOCKED'
+                              : 'EXECUTION FAILED'}
+                          </span>
+                        </div>
+                        <span className="text-[10px] px-2 py-0.5 rounded bg-space-950/80 border border-current">
+                          SIMULATED DISPATCH
+                        </span>
+                      </div>
+
+                      <p className="text-xs font-sans text-slate-200 leading-relaxed">
+                        {executionMessage ||
+                          (data?.action?.result === 'RECOVERED'
+                            ? `Payment rail recovery simulated successfully. Recovered ${formatINR(tx?.amount || 0)}.`
+                            : '')}
+                      </p>
+
+                      {(executionDetails || data?.action?.result === 'RECOVERED') && (
+                        <div className="text-[11px] font-mono text-slate-300 bg-space-950/60 p-2 rounded-lg border border-indigo-500/20 flex flex-wrap gap-x-4 gap-y-1">
+                          <span>
+                            Channel: <strong>{executionDetails?.channel || 'Smart Retry Queue'}</strong>
+                          </span>
+                          <span>
+                            Recovered Amount:{' '}
+                            <strong className="text-emerald-400">
+                              {formatINR(executionDetails?.recovered_amount || tx?.amount || 0)}
+                            </strong>
+                          </span>
+                          <span>Cap: 100% GMV Protected</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </>
               )}
             </>
@@ -376,6 +478,18 @@ export default function TransactionDetailModal({
             >
               CLOSE CONSOLE
             </button>
+
+            {data?.action_id && guardrails?.allowed && executionState !== 'SUCCESS' && data?.action?.result !== 'RECOVERED' && (
+              <button
+                onClick={handleExecuteRecovery}
+                disabled={executionState === 'RUNNING'}
+                className="px-4 py-2 rounded-xl bg-gradient-to-r from-cyan-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white text-xs font-black shadow-lg shadow-cyan-500/25 border border-cyan-400/40 transition-all flex items-center space-x-1.5 disabled:opacity-50"
+              >
+                <Zap className="w-3.5 h-3.5" />
+                <span>SIMULATE RECOVERY DISPATCH</span>
+              </button>
+            )}
+
             {data?.action_id && guardrails?.escalationRequired ? (
               <button
                 onClick={() => {

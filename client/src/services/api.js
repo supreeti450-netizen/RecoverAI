@@ -77,5 +77,13 @@ export const api = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ decision, reviewer, reason })
+    }).then(handleResponse),
+
+  // Simulated Gateway Recovery Dispatch Execution
+  executeRecoveryAction: (actionId, { dispatcher } = {}) =>
+    fetch(`${BASE_URL}/execute/${encodeURIComponent(actionId)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ dispatcher })
     }).then(handleResponse)
 };

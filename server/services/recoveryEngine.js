@@ -588,6 +588,201 @@ async function reviewRecoveryAction(actionId, { decision, reviewer, reason }) {
 }
 
 /**
+ * Simulates gateway payment rail recovery dispatch for an approved action.
+ * STRICT: Zero real payments/funds are moved. Pure simulated payment rail execution.
+ * Re-validates deterministic guardrails, prevents duplicate recoveries, and caps amount.
+ */
+async function executeRecoveryAction(actionId, { dispatcher = "RecoverAI Gateway Dispatcher" } = {}) {
+    const id = parseInt(actionId, 10);
+    if (isNaN(id) || id <= 0) {
+        return { error: "INVALID_ID", message: "Invalid actionId format" };
+    }
+
+    const client = await pool.connect();
+
+    try {
+        await client.query("BEGIN");
+
+        const actionRes = await client.query(
+            `
+            SELECT ra.*, t.amount, t.status AS tx_status, t.retry_count, t.fraud_score, t.payment_method, t.failure_reason, t.recovery_probability
+            FROM recovery_actions ra
+            JOIN transactions t ON ra.transaction_id = t.transaction_id
+            WHERE ra.action_id = $1
+            FOR UPDATE
+            `,
+            [id]
+        );
+
+        if (actionRes.rows.length === 0) {
+            await client.query("ROLLBACK");
+            return { error: "NOT_FOUND", message: `Recovery action #${id} not found` };
+        }
+
+        const action = actionRes.rows[0];
+
+        // 1. Ensure underlying transaction is FAILED
+        if (action.tx_status !== "FAILED") {
+            await client.query("ROLLBACK");
+            return {
+                error: "NOT_ELIGIBLE",
+                message: `Transaction ${action.transaction_id} was successful. Recovery execution is not applicable.`
+            };
+        }
+
+        // 2. Idempotency Check: Prevent duplicate executions
+        if (action.result === "RECOVERED" || Number(action.recovered_amount) > 0) {
+            await client.query("COMMIT");
+            return {
+                success: true,
+                already_executed: true,
+                message: `Recovery action #${id} has already been executed.`,
+                action: {
+                    ...action,
+                    recovered_amount: Number(action.recovered_amount).toFixed(2)
+                }
+            };
+        }
+
+        // 3. Block unreviewed human-escalated or rejected actions
+        const isApprovedByHuman = action.result === "APPROVED_BY_HUMAN";
+        const isPendingHuman = action.requires_human === true || action.status === "PENDING";
+        const isBlockedOrRejected = action.status === "BLOCKED" || action.status === "REJECTED" || action.result === "REJECTED_BY_HUMAN";
+
+        if (isPendingHuman) {
+            await client.query("ROLLBACK");
+            return {
+                error: "EXECUTION_BLOCKED",
+                message: `Recovery action #${id} requires human operator sign-off before dispatch can be executed.`
+            };
+        }
+
+        if (isBlockedOrRejected) {
+            await client.query("ROLLBACK");
+            return {
+                error: "EXECUTION_BLOCKED",
+                message: `Recovery action #${id} is in status '${action.status}' and cannot be executed.`
+            };
+        }
+
+        // 4. Re-check deterministic guardrails
+        const guardrailCheck = validateRecoveryAction(
+            {
+                status: action.tx_status,
+                retry_count: action.retry_count,
+                fraud_score: action.fraud_score,
+                amount: action.amount
+            },
+            {
+                decision: action.action_type,
+                confidence: action.confidence
+            }
+        );
+
+        if (!isApprovedByHuman && !guardrailCheck.allowed) {
+            await client.query("ROLLBACK");
+            return {
+                error: "EXECUTION_BLOCKED",
+                message: `Deterministic guardrail triggered: ${guardrailCheck.checks.filter(c => !c.passed).map(c => c.rule).join(", ")}`,
+                checks: guardrailCheck.checks
+            };
+        }
+
+        // 5. Capping: Never recover more than the original transaction amount
+        const maxRecoverable = Math.max(0, parseFloat(action.amount));
+        const recoveredAmount = maxRecoverable;
+
+        // 6. Simulate gateway dispatch
+        const executionTimestamp = new Date().toISOString();
+        const dispatchChannel = action.action_type === "WAIT_AND_RETRY"
+            ? "Smart Retry Queue"
+            : action.action_type === "CHANGE_PAYMENT_METHOD"
+            ? "Fallback Payment Rail"
+            : "Autonomous Recovery Gateway";
+
+        const updateRes = await client.query(
+            `
+            UPDATE recovery_actions
+            SET status = 'APPROVED',
+                result = 'RECOVERED',
+                recovered_amount = $1
+            WHERE action_id = $2
+            RETURNING *
+            `,
+            [recoveredAmount, id]
+        );
+
+        const updatedAction = updateRes.rows[0];
+
+        // 7. Audit log creation for compliance traceability
+        const auditPayload = {
+            simulated_dispatch_channel: dispatchChannel,
+            recovered_amount: Number(recoveredAmount).toFixed(2),
+            original_amount: Number(action.amount).toFixed(2),
+            execution_type: isApprovedByHuman ? "HUMAN_AUTHORIZED_EXECUTION" : "AUTONOMOUS_GUARDRAIL_EXECUTION",
+            guardrail_recheck_passed: true,
+            simulated: true,
+            executed_at: executionTimestamp
+        };
+
+        const auditRes = await client.query(
+            `
+            INSERT INTO audit_logs
+            (
+                transaction_id,
+                action_id,
+                event_type,
+                actor,
+                decision,
+                reasoning,
+                guardrails_checked,
+                outcome
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            RETURNING *
+            `,
+            [
+                action.transaction_id,
+                action.action_id,
+                "RECOVERY_EXECUTION",
+                dispatcher || "RecoverAI Gateway Dispatcher",
+                action.action_type,
+                `Simulated gateway recovery dispatch successful via ${dispatchChannel}. Recovered INR ${Number(recoveredAmount).toFixed(2)} (capped at 100% GMV).`,
+                JSON.stringify(auditPayload),
+                "RECOVERY_SUCCESSFUL"
+            ]
+        );
+
+        await client.query("COMMIT");
+
+        return {
+            success: true,
+            already_executed: false,
+            message: `Gateway recovery dispatch simulated successfully. Recovered INR ${Number(recoveredAmount).toFixed(2)}.`,
+            action: {
+                ...updatedAction,
+                recovered_amount: Number(updatedAction.recovered_amount).toFixed(2)
+            },
+            execution: {
+                action_id: updatedAction.action_id,
+                transaction_id: updatedAction.transaction_id,
+                status: "APPROVED",
+                result: "RECOVERED",
+                recovered_amount: Number(recoveredAmount).toFixed(2),
+                channel: dispatchChannel,
+                executed_at: executionTimestamp
+            },
+            audit_log: auditRes.rows[0]
+        };
+    } catch (err) {
+        await client.query("ROLLBACK");
+        throw err;
+    } finally {
+        client.release();
+    }
+}
+
+/**
  * Retrieves comprehensive analytics summary for dashboards.
  */
 async function getAnalyticsSummary() {
@@ -905,6 +1100,7 @@ module.exports = {
     getAuditLogs,
     getRecoveryActions,
     reviewRecoveryAction,
+    executeRecoveryAction,
     getAnalyticsSummary,
     getPaymentMethodAnalytics,
     getFailureReasonAnalytics
