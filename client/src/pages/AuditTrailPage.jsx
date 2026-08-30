@@ -15,7 +15,9 @@ import {
   RefreshCw,
   FileCheck,
   Lock,
-  Terminal
+  Terminal,
+  Download,
+  FileJson
 } from 'lucide-react';
 import { api } from '../services/api';
 import {
@@ -23,6 +25,12 @@ import {
   getStatusBadge,
   getActionTypeColor
 } from '../utils/formatters';
+import {
+  exportToCSV,
+  exportToJSON,
+  formatAuditLogsForCSV,
+  getExportFilename
+} from '../utils/exportUtils';
 import { TableRowSkeleton } from '../components/SkeletonLoader';
 
 export default function AuditTrailPage({ onSelectTransaction }) {
@@ -76,9 +84,22 @@ export default function AuditTrailPage({ onSelectTransaction }) {
     setExpandedLogId(expandedLogId === logId ? null : logId);
   };
 
+  const handleExportCSV = () => {
+    if (!logs || logs.length === 0) return;
+    const { headers, rows } = formatAuditLogsForCSV(logs);
+    const filename = getExportFilename('audit-log', 'csv');
+    exportToCSV(filename, headers, rows);
+  };
+
+  const handleExportJSON = () => {
+    if (!logs || logs.length === 0) return;
+    const filename = getExportFilename('audit-log', 'json');
+    exportToJSON(filename, logs);
+  };
+
   return (
     <div className="space-y-5 animate-fadeIn pb-16">
-      {/* Controls Bar: Search & Filter */}
+      {/* Controls Bar: Search, Filter & Compliance Export */}
       <div className="p-4 rounded-2xl hud-panel space-y-3">
         <div className="flex flex-col md:flex-row gap-3 items-center justify-between">
           <form onSubmit={handleSearchSubmit} className="relative w-full md:w-80">
@@ -92,7 +113,7 @@ export default function AuditTrailPage({ onSelectTransaction }) {
             />
           </form>
 
-          <div className="flex items-center space-x-2 w-full md:w-auto justify-end">
+          <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
             <select
               value={eventType}
               onChange={(e) => {
@@ -107,7 +128,28 @@ export default function AuditTrailPage({ onSelectTransaction }) {
             </select>
 
             <button
+              onClick={handleExportCSV}
+              disabled={loading || logs.length === 0}
+              title="Export compliance audit records to CSV"
+              className="flex items-center space-x-1.5 px-3 py-2 rounded-xl bg-space-900 hover:bg-space-850 text-cyan-400 hover:text-cyan-300 border border-cyan-500/30 text-xs font-mono font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>EXPORT CSV</span>
+            </button>
+
+            <button
+              onClick={handleExportJSON}
+              disabled={loading || logs.length === 0}
+              title="Export structured compliance audit trail to JSON"
+              className="flex items-center space-x-1.5 px-3 py-2 rounded-xl bg-space-900 hover:bg-space-850 text-violet-400 hover:text-violet-300 border border-violet-500/30 text-xs font-mono font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
+            >
+              <FileJson className="w-3.5 h-3.5" />
+              <span>EXPORT JSON</span>
+            </button>
+
+            <button
               onClick={fetchAuditLogs}
+              title="Refresh audit trail"
               className="p-2 rounded-xl bg-space-900 hover:bg-space-850 text-slate-300 hover:text-cyan-400 border border-indigo-500/30 transition-all"
             >
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-cyan-400' : ''}`} />

@@ -311,11 +311,13 @@ async function runAttackSuite() {
         const auditTrailData = await auditTrailRes.json();
         assert(auditTrailData.total > 0, "Audit trail contains records");
 
-        const hasAiAnalysisLogs = auditTrailData.data.some(l => l.event_type === "RECOVERY_ANALYSIS");
-        assert(hasAiAnalysisLogs, "Audit trail contains RECOVERY_ANALYSIS event logs");
+        const aiLogsRes = await fetch(`${BASE_URL}/audit-logs?event_type=RECOVERY_ANALYSIS&limit=10`);
+        const aiLogsData = await aiLogsRes.json();
+        assert(aiLogsData.data.some(l => l.event_type === "RECOVERY_ANALYSIS"), "Audit trail contains RECOVERY_ANALYSIS event logs");
 
-        const hasHumanReviewLogs = auditTrailData.data.some(l => l.event_type === "HUMAN_REVIEW");
-        assert(hasHumanReviewLogs, "Audit trail contains HUMAN_REVIEW event logs");
+        const humanLogsRes = await fetch(`${BASE_URL}/audit-logs?event_type=HUMAN_REVIEW&limit=10`);
+        const humanLogsData = await humanLogsRes.json();
+        assert(humanLogsData.data.some(l => l.event_type === "HUMAN_REVIEW"), "Audit trail contains HUMAN_REVIEW event logs");
 
         const sampleLog = auditTrailData.data[0];
         assert(typeof sampleLog.guardrails_checked === "object" && sampleLog.guardrails_checked !== null, "Audit log has structured guardrails_checked payload");

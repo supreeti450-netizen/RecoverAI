@@ -11,7 +11,9 @@ import {
   CheckCircle2,
   RefreshCw,
   Crosshair,
-  Target
+  Target,
+  Download,
+  FileJson
 } from 'lucide-react';
 import { api } from '../services/api';
 import {
@@ -21,6 +23,12 @@ import {
   getStatusBadge,
   getActionTypeColor
 } from '../utils/formatters';
+import {
+  exportToCSV,
+  exportToJSON,
+  formatOpportunitiesForCSV,
+  getExportFilename
+} from '../utils/exportUtils';
 import AnimatedNumber from '../components/AnimatedNumber';
 import { KpiCardSkeleton, TableRowSkeleton } from '../components/SkeletonLoader';
 
@@ -56,6 +64,19 @@ export default function OpportunitiesPage({ onSelectTransaction, onOpenReviewMod
     }
     return true;
   });
+
+  const handleExportCSV = () => {
+    if (!filteredList || filteredList.length === 0) return;
+    const { headers, rows } = formatOpportunitiesForCSV(filteredList);
+    const filename = getExportFilename('recovery-opportunities', 'csv');
+    exportToCSV(filename, headers, rows);
+  };
+
+  const handleExportJSON = () => {
+    if (!filteredList || filteredList.length === 0) return;
+    const filename = getExportFilename('recovery-opportunities', 'json');
+    exportToJSON(filename, filteredList);
+  };
 
   const totalValueAtRisk = opportunities.reduce(
     (acc, cur) => acc + (parseFloat(cur.revenue_at_risk) || 0),
@@ -164,13 +185,35 @@ export default function OpportunitiesPage({ onSelectTransaction, onOpenReviewMod
           </button>
         </div>
 
-        <button
-          onClick={fetchOpportunities}
-          className="p-2 rounded-xl bg-space-900 hover:bg-space-850 text-slate-300 hover:text-cyan-400 border border-indigo-500/30 transition-all"
-          title="Refresh opportunity pool"
-        >
-          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-cyan-400' : ''}`} />
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={handleExportCSV}
+            disabled={loading || filteredList.length === 0}
+            title="Export recovery opportunities to CSV"
+            className="flex items-center space-x-1.5 px-3 py-2 rounded-xl bg-space-900 hover:bg-space-850 text-cyan-400 hover:text-cyan-300 border border-cyan-500/30 text-xs font-mono font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>EXPORT CSV</span>
+          </button>
+
+          <button
+            onClick={handleExportJSON}
+            disabled={loading || filteredList.length === 0}
+            title="Export recovery opportunities to JSON"
+            className="flex items-center space-x-1.5 px-3 py-2 rounded-xl bg-space-900 hover:bg-space-850 text-violet-400 hover:text-violet-300 border border-violet-500/30 text-xs font-mono font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
+          >
+            <FileJson className="w-3.5 h-3.5" />
+            <span>EXPORT JSON</span>
+          </button>
+
+          <button
+            onClick={fetchOpportunities}
+            className="p-2 rounded-xl bg-space-900 hover:bg-space-850 text-slate-300 hover:text-cyan-400 border border-indigo-500/30 transition-all"
+            title="Refresh opportunity pool"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-cyan-400' : ''}`} />
+          </button>
+        </div>
       </div>
 
       {/* Cyber Table of Candidates */}
